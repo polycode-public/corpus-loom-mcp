@@ -391,20 +391,32 @@ def test_entities_seam_called_with_lazy_default_and_exact_signature(conn, config
     import corpusindex
 
     calls = []
+    loaded_seeds = object()
+    loaded_aliases = object()
 
     def fake_store_doc_entities(conn, doc_id, doc, seeds, aliases):
         calls.append((doc_id, doc.probe.path, seeds, aliases))
 
-    fake_module = types.SimpleNamespace(store_doc_entities=fake_store_doc_entities)
+    fake_module = types.SimpleNamespace(
+        store_doc_entities=fake_store_doc_entities,
+        load_seeds=lambda path: loaded_seeds,
+        load_aliases=lambda path: loaded_aliases,
+    )
     monkeypatch.setitem(sys.modules, "corpusindex.entities", fake_module)
     monkeypatch.setattr(corpusindex, "entities", fake_module, raising=False)
+    from corpusindex.indexer import _load_aliases_cached, _load_seeds_cached
+
+    _load_seeds_cached.cache_clear()
+    _load_aliases_cached.cache_clear()
 
     update(config, conn, adapters)
 
+    # The default seam loads config.seeds/config.aliases paths into value
+    # objects before calling store_doc_entities.
     assert len(calls) == 7
     doc_id, path, seeds, aliases = calls[0]
-    assert seeds == config.seeds
-    assert aliases == config.aliases
+    assert seeds is loaded_seeds
+    assert aliases is loaded_aliases
 
 
 def test_update_source_single_source(conn, config, adapters):

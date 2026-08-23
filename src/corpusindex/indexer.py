@@ -21,6 +21,7 @@ import json
 import logging
 import sqlite3
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import PurePath
 from typing import Callable, Iterable
 
@@ -58,11 +59,31 @@ class _ExistingDoc:
     content_hash: str
 
 
+@lru_cache(maxsize=8)
+def _load_seeds_cached(path: str | None) -> object:
+    from corpusindex import entities
+
+    return entities.load_seeds(path)
+
+
+@lru_cache(maxsize=8)
+def _load_aliases_cached(path: str | None) -> object:
+    from corpusindex import entities
+
+    return entities.load_aliases(path)
+
+
 def _default_store_entities(
     conn: sqlite3.Connection, doc_id: int, doc: Doc, seeds: object, aliases: object
 ) -> None:
     from corpusindex import entities
 
+    # The update() call site forwards config.seeds/config.aliases, which are
+    # paths (or None) — load them here; injected callables may receive either.
+    if not hasattr(seeds, "persons"):
+        seeds = _load_seeds_cached(str(seeds) if seeds is not None else None)
+    if not hasattr(aliases, "alias_of"):
+        aliases = _load_aliases_cached(str(aliases) if aliases is not None else None)
     entities.store_doc_entities(conn, doc_id, doc, seeds, aliases)
 
 
