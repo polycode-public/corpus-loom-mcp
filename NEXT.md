@@ -18,10 +18,17 @@ where the build taught us something.
 
 | Workstream | Agent label | Branch | Worktree | Status |
 |---|---|---|---|---|
-| W4 cli | the cli agent | agent/cli | scratchpad/wt-cli | running |
-| W4 mcp | the mcp agent | agent/mcp | scratchpad/wt-mcp | running |
+| W5 release | the release agent | agent/release | scratchpad/wt-release | running |
 
 ## Merged, awaiting verification
 
-(none — W1–W3 verified: 197 tests green on main. Pipeline fix applied at W2
-merge: multi-recipient To/Cc headers now expand via getaddresses.)
+(none — W1–W4 verified: 234 tests green on main. Pipeline fixes applied at
+merges: multi-recipient To/Cc via getaddresses (W2); default entities seam
+loads Seeds/Aliases from config paths (W4, found by the cli agent).)
+
+## After W5 release merges
+
+Deployment in ~/projects/diy-accounting-limited/index/ (corpus.toml over the
+five repos + drive + mail mirrors, archive commits-only, finance/personnel
+embed_exclude), M0 verification against real corpora, embed dry-run, operator
+gate, drain. Fixes found there feed back to this repo.
