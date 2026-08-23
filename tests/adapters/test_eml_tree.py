@@ -112,8 +112,32 @@ def test_meta_fields_and_content_hash():
     assert "priya.raman@bluegable.example.com" in doc.meta["from"]
     assert "fixturebox@example.com" in doc.meta["to"]
     assert doc.meta["cc"] is None
+    assert doc.meta["bcc"] is None
+    assert doc.meta["reply_to"] is None
     assert doc.meta["labels"] == []
     assert doc.doc_date == "2024-03-07T09:41:20+00:00"
+
+
+def test_bcc_and_reply_to_captured_when_present(tmp_path):
+    mailbox = tmp_path / "mailbox"
+    day_dir = mailbox / "2022" / "8" / "1"
+    day_dir.mkdir(parents=True)
+    (day_dir / "withbcc.eml").write_bytes(
+        b"From: sender@example.com\r\n"
+        b"To: fixturebox@example.com\r\n"
+        b"Cc: watcher@example.com\r\n"
+        b"Bcc: silent@example.com\r\n"
+        b"Reply-To: replies@example.com\r\n"
+        b"Subject: Header capture check\r\n"
+        b"MIME-Version: 1.0\r\n"
+        b"Content-Type: text/plain; charset=\"utf-8\"\r\n"
+        b"\r\n"
+        b"Body text.\r\n"
+    )
+    adapter = EmlTreeAdapter(_config(root=mailbox))
+    doc = _load(adapter, "2022/8/1/withbcc.eml")
+    assert doc.meta["bcc"] == "silent@example.com"
+    assert doc.meta["reply_to"] == "replies@example.com"
 
 
 def test_fallback_date_from_path_when_date_header_missing(tmp_path):

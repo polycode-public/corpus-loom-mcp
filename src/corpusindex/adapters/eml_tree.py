@@ -133,6 +133,8 @@ class EmlTreeAdapter:
             "from": _header_str(msg, "From"),
             "to": _header_str(msg, "To"),
             "cc": _header_str(msg, "Cc"),
+            "bcc": _header_str(msg, "Bcc"),
+            "reply_to": _header_str(msg, "Reply-To"),
             "attachments": body.attachments,
             "labels": self._labels.get(stem, []),
         }
