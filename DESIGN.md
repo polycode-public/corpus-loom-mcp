@@ -231,6 +231,10 @@ Workspace-specific (stays in this workspace, never in the engine repo): `index/c
 
 **M3 — release hygiene.** Fixture-corpus tests green in CI, README quickstart (init a config against any maildir/file-tree/git corpus), first tag. Verify: a fresh clone indexes the fixture corpus and passes the M0 checks scripted.
 
+## Embedding privacy
+
+**Decided (operator, 2026-08-23): converted Drive documents under `finance/` and `personnel/` are never sent to the Voyage API** — `embed = false` by path glob on the drive source. They remain fully lexically searchable and entity-linked; semantic search covers the rest of the corpus.
+
 ## Open questions (operator decision needed)
 
-1. **Send support@ bodies (and now converted Drive finance/personnel documents) to the Voyage API?** Embedding transmits that text (names, addresses, occasionally account details) to a third-party API. Options: (a) embed everything — simplest, best recall, acceptable if Voyage's zero-retention API terms satisfy you; (b) `embed = false` per source/path-glob — the excluded material stays fully lexically searchable and entity-linked, semantic search covers everything else. Config supports either; default in this plan is (a) pending your call, gated at the M1 dry-run.
+1. **Send support@ bodies to the Voyage API?** Embedding transmits customer-support message text (names, addresses, occasionally account details) to a third-party API. Options: (a) embed them — best recall, acceptable if Voyage's zero-retention API terms satisfy you; (b) `embed = false` on the support@ mailbox, matching the finance/personnel decision — support mail stays lexically searchable and entity-linked. Config supports either; default in this plan is (a) pending your call, gated at the M1 dry-run.
