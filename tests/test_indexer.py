@@ -214,12 +214,12 @@ def test_first_run_inserts_all_and_fts_matches(conn, config, adapters):
 
     assert isinstance(stats, UpdateStats)
     assert stats.sources["notes"] == SourceStats(added=4, chunks=3)
-    assert stats.sources["mail"] == SourceStats(added=1, chunks=1)
+    assert stats.sources["mail"] == SourceStats(added=1, chunks=2)
     assert stats.sources["repo"] == SourceStats(added=2, chunks=2)
 
     assert conn.execute("SELECT count(*) FROM documents").fetchone()[0] == 7
     assert _fts_match_count(conn, "widgets") == 1
-    assert _fts_match_count(conn, "overdue") == 1
+    assert _fts_match_count(conn, "overdue") == 2  # Subject line + body both say "overdue"
     assert _fts_match_count(conn, "hello") == 1
 
     readme_id, indexed, *_ = _doc_row(conn, "notes", "readme.md")
@@ -231,8 +231,16 @@ def test_first_run_inserts_all_and_fts_matches(conn, config, adapters):
     assert header_row.startswith("notes/readme.md\n\n")
 
     mail_id = _doc_row(conn, "mail", "2024/3/7/abc.eml")[0]
-    mail_header = _chunk_texts(conn, mail_id)[0]
-    assert mail_header.startswith("Invoice overdue — alice@example.com, 2024-03-07\n\n")
+    mail_chunks = _chunk_texts(conn, mail_id)
+    assert len(mail_chunks) == 2
+    headers_chunk, body_chunk = mail_chunks
+    assert headers_chunk.startswith("Invoice overdue — alice@example.com, 2024-03-07\n\n")
+    assert "From: alice@example.com" in headers_chunk
+    assert "Subject: Invoice overdue" in headers_chunk
+    assert "Date: 2024-03-07T10:00:00Z" in headers_chunk
+    assert "To:" not in headers_chunk
+    assert body_chunk.startswith("Invoice overdue — alice@example.com, 2024-03-07\n\n")
+    assert "overdue invoice ref 4471" in body_chunk
 
     commit_id = _doc_row(conn, "repo", "commit/aaaaaaaaaaaa1111")[0]
     commit_header = _chunk_texts(conn, commit_id)[0]
@@ -382,6 +390,90 @@ def test_metadata_only_doc_gets_no_chunks(conn, config, adapters):
     doc_id, indexed, *_ = _doc_row(conn, "notes", "logo.png")
     assert indexed == 0
     assert conn.execute("SELECT count(*) FROM chunks WHERE doc_id = ?", (doc_id,)).fetchone()[0] == 0
+
+
+def test_mail_headers_chunk_includes_all_present_fields_and_labels(conn, config):
+    entries = [
+        {
+            "path": "2024/5/1/full.eml",
+            "stat_sig": "300:50",
+            "content_hash": "m2",
+            "title": "Account update",
+            "doc_date": "2024-05-01T12:00:00Z",
+            "bytes": 300,
+            "meta": {
+                "from": "billing@example.com",
+                "to": "customer@example.com",
+                "cc": "manager@example.com",
+                "bcc": "audit@example.com",
+                "reply_to": "support@example.com",
+                "labels": ["INBOX", "IMPORTANT"],
+            },
+            "text": "Your account details have been updated.",
+        }
+    ]
+    other = {
+        "notes": FakeAdapter("notes", []),
+        "mail": FakeAdapter("mail", entries),
+        "repo": FakeAdapter("repo", []),
+    }
+    update(config, conn, other, store_entities=EntityStub())
+
+    doc_id = _doc_row(conn, "mail", "2024/5/1/full.eml")[0]
+    chunks = _chunk_texts(conn, doc_id)
+    assert len(chunks) == 2
+    headers_chunk, body_chunk = chunks
+    assert headers_chunk == (
+        "Account update — billing@example.com, 2024-05-01\n\n"
+        "From: billing@example.com\n"
+        "To: customer@example.com\n"
+        "Cc: manager@example.com\n"
+        "Bcc: audit@example.com\n"
+        "Reply-To: support@example.com\n"
+        "Subject: Account update\n"
+        "Date: 2024-05-01T12:00:00Z\n"
+        "Labels: INBOX, IMPORTANT"
+    )
+    assert body_chunk.endswith("Your account details have been updated.")
+
+
+def test_metadata_only_mail_doc_gets_headers_chunk_only(conn, config):
+    entries = [
+        {
+            "path": "2024/6/1/attachment-only.eml",
+            "stat_sig": "300:60",
+            "content_hash": "m3",
+            "title": "Signed contract",
+            "doc_date": "2024-06-01T08:00:00Z",
+            "bytes": 400,
+            "meta": {
+                "from": "legal@example.com",
+                "to": "customer@example.com",
+                "labels": ["Contracts"],
+            },
+            "text": None,
+        }
+    ]
+    other = {
+        "notes": FakeAdapter("notes", []),
+        "mail": FakeAdapter("mail", entries),
+        "repo": FakeAdapter("repo", []),
+    }
+    update(config, conn, other, store_entities=EntityStub())
+
+    doc_id, indexed, *_ = _doc_row(conn, "mail", "2024/6/1/attachment-only.eml")
+    assert indexed == 0
+    chunks = _chunk_texts(conn, doc_id)
+    assert len(chunks) == 1
+    assert chunks[0] == (
+        "Signed contract — legal@example.com, 2024-06-01\n\n"
+        "From: legal@example.com\n"
+        "To: customer@example.com\n"
+        "Subject: Signed contract\n"
+        "Date: 2024-06-01T08:00:00Z\n"
+        "Labels: Contracts"
+    )
+    assert _fts_match_count(conn, "Contracts") == 1
 
 
 def test_entities_seam_called_with_lazy_default_and_exact_signature(conn, config, adapters, monkeypatch):

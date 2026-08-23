@@ -106,11 +106,53 @@ def _unchanged(probe: DocProbe, existing: _ExistingDoc) -> bool:
     return False
 
 
+_MAIL_HEADER_FIELDS = (
+    ("From", "from"),
+    ("To", "to"),
+    ("Cc", "cc"),
+    ("Bcc", "bcc"),
+    ("Reply-To", "reply_to"),
+)
+
+
 def _mail_header(doc: Doc) -> str:
     subject = doc.title or "(no subject)"
     sender = (doc.meta or {}).get("from", "")
     date = (doc.doc_date or "")[:10]
     return f"{subject} — {sender}, {date}"
+
+
+def _mail_headers_block(doc: Doc) -> str | None:
+    """Plain-text 'Key: value' lines for the synthetic HEADERS chunk: the mail
+    address headers, Subject, Date, and comma-joined Gmail Labels. Any field
+    absent from doc.meta/title/doc_date is omitted rather than left blank."""
+    meta = doc.meta or {}
+    lines: list[str] = []
+    for label, key in _MAIL_HEADER_FIELDS:
+        value = meta.get(key)
+        if value:
+            lines.append(f"{label}: {value}")
+    if doc.title:
+        lines.append(f"Subject: {doc.title}")
+    if doc.doc_date:
+        lines.append(f"Date: {doc.doc_date}")
+    labels = meta.get("labels") or []
+    if labels:
+        lines.append(f"Labels: {', '.join(labels)}")
+    if not lines:
+        return None
+    return "\n".join(lines)
+
+
+def _build_mail_chunks(doc: Doc) -> list[str]:
+    header = _mail_header(doc)
+    chunks: list[str] = []
+    block = _mail_headers_block(doc)
+    if block is not None:
+        chunks.append(f"{header}\n\n{block}")
+    if doc.text is not None:
+        chunks.extend(chunk_prose(doc.text, header))
+    return chunks
 
 
 def _commit_header(source: SourceConfig, probe: DocProbe, doc: Doc) -> str:
@@ -121,13 +163,13 @@ def _commit_header(source: SourceConfig, probe: DocProbe, doc: Doc) -> str:
 
 
 def _build_chunks(source: SourceConfig, doc: Doc) -> list[str]:
+    if source.type == "eml_tree":
+        return _build_mail_chunks(doc)
     if doc.text is None:
         return []
     probe = doc.probe
     if probe.path.startswith("commit/"):
         return chunk_whole(doc.text, _commit_header(source, probe, doc))
-    if source.type == "eml_tree":
-        return chunk_prose(doc.text, _mail_header(doc))
     header = f"{source.name}/{probe.path}"
     if is_code_extension(probe.path):
         return chunk_code(doc.text, header)
