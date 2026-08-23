@@ -10,8 +10,8 @@ calling it twice for the same doc_id adds nothing.
 
 Extraction rules (DESIGN.md "Entity extraction and normalisation"):
 
-- Mail (doc.meta has any of 'from'/'to'/'cc'): each address -> 'email'
-  entity, rel = from/to/cc.
+- Mail (doc.meta has any of 'from'/'to'/'cc'/'bcc'/'reply_to'): each
+  address -> 'email' entity, rel = from/to/cc/bcc/reply_to.
 - Git commit (doc.meta has 'author_name' or 'author_email'): 'email' entity
   rel='author' from author_name/author_email, plus rel='committer' from
   committer_name/committer_email when present.
@@ -22,7 +22,7 @@ Extraction rules (DESIGN.md "Entity extraction and normalisation"):
   seed person/org name against doc.title and doc.probe.path -> 'person' /
   'org' entity, rel='mentions'.
 
-doc.meta address field shape (mail 'from'/'to'/'cc'): a single address or a
+doc.meta address field shape (mail 'from'/'to'/'cc'/'bcc'/'reply_to'): a single address or a
 list of addresses; each address is either a plain string -- optionally
 "Display Name <email@x>" form, parsed with email.utils.parseaddr, so
 RFC-2047 decoding is expected to already have happened upstream -- or a
@@ -77,7 +77,7 @@ from corpusindex.adapters.base import Doc
 _PUNCT_RE = re.compile(r"[^\w\s]", re.UNICODE)
 _WS_RE = re.compile(r"\s+")
 
-MAIL_ADDRESS_FIELDS = ("from", "to", "cc")
+MAIL_ADDRESS_FIELDS = ("from", "to", "cc", "bcc", "reply_to")
 
 
 def normalize_email_key(address: str) -> str:

@@ -92,6 +92,28 @@ def test_mail_from_to_cc_creates_email_entities_with_rels(conn):
     assert to_entity[1] == "Acme Billing"
 
 
+def test_mail_bcc_and_reply_to_creates_email_entities_with_rels(conn):
+    doc_id = insert_doc(conn, "mail", "mail/inbox/2.eml", title="Invoice question")
+    doc = Doc(
+        probe=DocProbe(source="mail", path="mail/inbox/2.eml"),
+        content_hash="h2",
+        title="Invoice question",
+        meta={
+            "from": "Jane Roe <jane.roe@example.com>",
+            "bcc": "Silent Watcher <silent@example.com>",
+            "reply_to": "replies@example.com",
+        },
+    )
+    store_doc_entities(conn, doc_id, doc, EMPTY, NO_ALIASES)
+
+    rels = fetch_rels(conn, doc_id)
+    assert ("bcc", "email", "silent@example.com") in rels
+    assert ("reply_to", "email", "replies@example.com") in rels
+
+    bcc_entity = fetch_entity(conn, "email", "silent@example.com")
+    assert bcc_entity[1] == "Silent Watcher"
+
+
 def test_display_name_most_frequent_wins(conn):
     key = "terry@example.com"
     for i, name in enumerate(["DIY Customer Service", "DIY Customer Service", "Terry"]):

@@ -2,7 +2,10 @@ import sqlite3
 
 import pytest
 
+from corpusindex.adapters.base import Doc, DocProbe
+from corpusindex.config import Config, SourceConfig
 from corpusindex.db import connect, has_vec
+from corpusindex.indexer import update
 from corpusindex.search import Hit, search
 
 
@@ -274,3 +277,60 @@ def test_semantic_respects_source_filter(conn):
         sources=["mail"],
     )
     assert hits == []
+
+
+class _MailAdapter:
+    name = "mail"
+
+    def __init__(self, entries):
+        self.entries = entries
+
+    def discover(self):
+        for e in self.entries:
+            yield DocProbe(source=self.name, path=e["path"], stat_sig="1:1")
+
+    def load(self, probe):
+        e = next(x for x in self.entries if x["path"] == probe.path)
+        return Doc(
+            probe=probe,
+            content_hash=e["path"],
+            title=e.get("title"),
+            doc_date=e.get("doc_date"),
+            meta=e.get("meta", {}),
+            text=e.get("text"),
+        )
+
+
+def test_label_query_finds_mail_doc_via_headers_chunk(conn):
+    config = Config(
+        db=":memory:",
+        sources=(SourceConfig(name="mail", type="eml_tree", root="."),),
+    )
+    adapter = _MailAdapter(
+        [
+            {
+                "path": "2026/1/1/labelled.eml",
+                "title": "Quarterly renewal reminder",
+                "doc_date": "2026-01-01T09:00:00+00:00",
+                "meta": {
+                    "from": "billing@example.com",
+                    "to": "customer@example.com",
+                    "labels": ["IMPORTANT", "Finance/Renewals"],
+                },
+                "text": "This is a routine reminder with no distinctive body terms.",
+            }
+        ]
+    )
+    update(config, conn, {"mail": adapter}, store_entities=lambda *a, **k: None)
+
+    hits = search(conn, "Renewals", mode="lexical")
+    assert any(h.path == "2026/1/1/labelled.eml" for h in hits)
+
+    top = next(h for h in hits if h.path == "2026/1/1/labelled.eml")
+    assert top.chunk_seq == 0
+    matched_chunk = conn.execute(
+        "SELECT c.text FROM chunks c JOIN documents d ON d.doc_id = c.doc_id"
+        " WHERE d.path = ? AND c.seq = ?",
+        ("2026/1/1/labelled.eml", top.chunk_seq),
+    ).fetchone()[0]
+    assert "Labels: IMPORTANT, Finance/Renewals" in matched_chunk
