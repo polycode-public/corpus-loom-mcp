@@ -19,8 +19,12 @@ where the build taught us something.
 | Workstream | Agent label | Branch | Worktree | Status |
 |---|---|---|---|---|
 | W1 foundation | the foundation agent | agent/foundation | scratchpad/wt-foundation | running |
-| W1 extract | the extract agent | agent/extract | scratchpad/wt-extract | running |
 
 ## Merged, awaiting verification
 
-(none)
+- W1 extract (`agent/extract`, 5 commits, 57 tests green on main) — verify against
+  foundation's fixture corpus once W1 foundation merges; then remove.
+  Settled API: decode.classify/decode_text, html_to_text, mailbody.extract_body →
+  MailBody(text, attachments), chunk_prose/csv/code/whole (header-prefixed),
+  convert() never raises. classify() is intrinsic; per-source convert gating
+  belongs to config/indexer.
