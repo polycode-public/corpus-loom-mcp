@@ -37,6 +37,39 @@ pipx install "corpus-loom-mcp @ git+https://github.com/polycode-public/corpus-lo
 
 Both give you the `corpus` and `corpus-mcp` commands. To hack on the engine itself, see [Development](#development) below.
 
+### Install by pasting a prompt
+
+If you use Claude (or another agent that can run shell commands — Claude Code, or a Claude Desktop cowork session on a folder), you can paste the block below into the chat and let it drive the whole install. In a plain chat without shell access it will guide you through the steps instead.
+
+```text
+Install corpus-loom-mcp for me (https://github.com/polycode-public/corpus-loom-mcp) —
+an MCP server + CLI that builds a hybrid BM25+embeddings search index, with entity
+linking, over local mirrors: plain file trees, gyb-style .eml Gmail backups, and git
+checkouts. It is read-only over the mirrors; never modify them. Ask me before anything
+irreversible and before anything that costs money.
+
+1. Check python3.11+ exists. Agree an install directory with me (default ./corpus-loom),
+   create a venv there, and install:
+   pip install "corpus-loom-mcp @ git+https://github.com/polycode-public/corpus-loom-mcp"
+2. Ask me which corpora to index: paths of file trees, mail trees, git checkouts (and
+   branch). Ask whether any paths must never be sent to the embeddings API — those get
+   embed = false or embed_exclude globs on their source.
+3. Write corpus.toml in the install directory following the Quickstart section of
+   https://raw.githubusercontent.com/polycode-public/corpus-loom-mcp/main/README.md
+4. Build the free lexical index and show me the numbers:
+   corpus update --config corpus.toml --no-embed && corpus stats --config corpus.toml
+5. Embeddings are optional and use the paid Voyage AI API. Only if I want them:
+   I supply VOYAGE_API_KEY (env, or .env next to corpus.toml); you run
+   corpus embed --config corpus.toml --dry-run, show me the projected cost, and run
+   corpus embed only after my explicit go-ahead.
+6. Register the MCP server (absolute paths, the venv's bin/corpus-mcp):
+   - Claude Code:  claude mcp add corpus-loom -- <venv>/bin/corpus-mcp --config <dir>/corpus.toml
+   - Claude Desktop: merge {"corpus-loom": {"command": "<venv>/bin/corpus-mcp",
+     "args": ["--config", "<dir>/corpus.toml"]}} into mcpServers in
+     claude_desktop_config.json, then tell me to restart Desktop.
+7. Verify: corpus search "<a real word from my data>" --mode lexical — show me the hits.
+```
+
 ## Quickstart
 
 Point it at any mix of a plain file tree, a `.eml` mail tree (the layout [gyb](https://github.com/GAM-team/got-your-back) produces), and a git repo. Write a `corpus.toml`:
