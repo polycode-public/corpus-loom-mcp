@@ -1,0 +1,11 @@
+Bluegable Systems Ltd — fixture accounts summary, year ending 31 Dec 2023
+(entirely fictitious data for tests)
+
+Turnover:            184,200.00
+Cost of sales:        61,450.00
+Gross profit:        122,750.00
+Administrative:       74,310.00
+Operating profit:     48,440.00
+
+Corporation tax provision calculated at the small profits rate.
+Prepared by Hollowbeck Accounting Partners, February 2024.

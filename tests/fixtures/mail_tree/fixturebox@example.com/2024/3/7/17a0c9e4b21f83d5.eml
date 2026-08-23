@@ -1,0 +1,24 @@
+Return-Path: <priya.raman@bluegable.example.com>
+Delivered-To: fixturebox@example.com
+Received: from mail.bluegable.example.com (mail.bluegable.example.com [192.0.2.17])
+        by mx.example.com with ESMTPS id b7si1029384wrx.83.2024.03.07
+        for <fixturebox@example.com>;
+        Thu, 7 Mar 2024 09:41:22 +0000 (UTC)
+Message-ID: <caf9x17q3k.fsf@mail.bluegable.example.com>
+Date: Thu, 7 Mar 2024 09:41:20 +0000
+From: Priya Raman <priya.raman@bluegable.example.com>
+To: Fixture Support <fixturebox@example.com>
+Subject: Invoice INV-2024-0312 query
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+
+Hello,
+
+We received invoice INV-2024-0312 for 480.00 but our purchase order
+PO-7719 was for the Starter package, not Professional. Could you send a
+corrected invoice or a credit note?
+
+Kind regards,
+Priya Raman
+Accounts, Bluegable Systems Ltd

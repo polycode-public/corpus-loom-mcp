@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "corpus-loom-mcp"
+version = "0.1.0"
+description = "Hybrid lexical + semantic index over file trees, .eml mail trees, and git repos: CLI + FastMCP server over a single SQLite file."
+readme = "README.md"
+license = "MPL-2.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp",
+    "sqlite-vec",
+    "voyageai",
+]
+
+[project.scripts]
+corpus = "corpusindex.cli:main"
+corpus-mcp = "corpusindex.mcp_server:main"
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,34 @@
+Return-Path: <tomasz.wieckowski@amberline.example.com>
+Delivered-To: fixturebox@example.com
+Received: from relay2.amberline.example.com (relay2.amberline.example.com [192.0.2.130])
+        by mx.example.com with ESMTPS id n1si50823wrt.221.2025.01.06
+        for <fixturebox@example.com>;
+        Mon, 6 Jan 2025 14:33:19 +0000 (UTC)
+Message-ID: <PAXPR07MB6662A9@relay2.amberline.example.com>
+Date: Mon, 6 Jan 2025 14:33:12 +0000
+From: Tomasz Wieckowski <tomasz.wieckowski@amberline.example.com>
+To: fixturebox@example.com
+Subject: December cashflow workbook attached
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="=-t7Zq0ceGkOFExhrTPmXn"
+
+--=-t7Zq0ceGkOFExhrTPmXn
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+Hi,
+
+The December cashflow workbook is attached as discussed. Sheet 2 has
+the year-end projection.
+
+Tomasz
+
+--=-t7Zq0ceGkOFExhrTPmXn
+Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;
+        name="cashflow-december-2024.xlsx"
+Content-Disposition: attachment; filename="cashflow-december-2024.xlsx"
+Content-Transfer-Encoding: base64
+
+UEsDBCBub3QgYSByZWFsIHhsc3gsIGZpeHR1cmUgYnl0ZXMgb25seQ==
+
+--=-t7Zq0ceGkOFExhrTPmXn--
