@@ -156,6 +156,7 @@ Normalisation:
 3. Commits are immutable and append-only: key `commit/<sha>`, insert-only; commits no longer reachable from the configured branch are deleted on reindex.
 4. Embedding is a separate drain step: select `embedded=0`, batch ≤128 chunks and ≤100k tokens per Voyage call, retry with backoff, write vector + set flag per chunk transactionally. A killed run resumes exactly where it stopped; unchanged content never re-embeds (content-hash keyed).
 5. **Hook**: engine command `corpus update` (implies drain unless `--no-embed`). Workspace wiring: append `corpus update --config ~/projects/diy-accounting-limited/index/corpus.toml` to the existing `reindex` skill, and note in `drive/pull.sh` / `mail/pull.sh` docs that syncs should be followed by it (the pull scripts themselves stay index-agnostic; the skill is the orchestrator).
+6. **Forced re-chunk on chunking-logic changes**: `indexer.INDEX_LAYOUT_VERSION`, stamped into `index_meta.layout_version` at the end of every `update()`, is the generic escape hatch for a chunking-logic change (a new synthetic chunk, a header-format change, a different split policy) that isn't visible to the stat_sig/git_sha fast path. When the stored value differs from `INDEX_LAYOUT_VERSION` on a non-empty `documents` table, that run bypasses the fast path entirely — every discovered document is reloaded and re-chunked regardless of its signature — then settles back to normal incremental behaviour once the stamp is current.
 
 ## Interfaces
 

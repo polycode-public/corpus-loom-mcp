@@ -13,6 +13,21 @@ lazily (inside the wrapper, at call time) and forwards to it exactly as:
 
 Tests exercise update_source()/update() with a stub store_entities and never
 need corpusindex.entities to exist.
+
+Layout version / forced re-chunk: INDEX_LAYOUT_VERSION is a generic escape
+hatch for any future change to how documents are turned into chunks (a new
+synthetic chunk, a changed header format, a different splitting policy) that
+isn't reflected by a document's stat_sig/git_sha and so the normal
+unchanged-fast-path would never re-run. update() stores the current value in
+index_meta under key "layout_version" at the end of every run. At the start
+of a run, if the stored value differs from INDEX_LAYOUT_VERSION (including
+absent) and the documents table is non-empty, the unchanged fast path is
+bypassed for that run: every discovered document is treated as changed
+(reloaded, re-chunked, chunks' embedded reset to 0) regardless of
+stat_sig/git_sha, while deletions of documents no longer present are still
+processed normally. A fresh/empty database just stamps the current version
+with nothing to re-chunk. Bump INDEX_LAYOUT_VERSION whenever chunk shape or
+content changes in a way existing rows won't otherwise pick up.
 """
 
 from __future__ import annotations
@@ -27,7 +42,7 @@ from typing import Callable, Iterable
 
 from corpusindex.adapters.base import Doc, DocProbe, SourceAdapter
 from corpusindex.config import Config, SourceConfig
-from corpusindex.db import has_vec
+from corpusindex.db import get_meta, has_vec, set_meta
 from corpusindex.extract.chunk import chunk_code, chunk_csv, chunk_prose, chunk_whole
 from corpusindex.extract.decode import is_code_extension
 
@@ -36,6 +51,9 @@ logger = logging.getLogger(__name__)
 StoreEntities = Callable[[sqlite3.Connection, int, Doc, object, object], None]
 
 _VEC_TABLES = ("chunks_vec_prose", "chunks_vec_code")
+
+INDEX_LAYOUT_VERSION = "2"
+_LAYOUT_VERSION_KEY = "layout_version"
 
 
 @dataclass(slots=True)
@@ -277,8 +295,14 @@ def update_source(
     adapter: SourceAdapter,
     *,
     store_entities: StoreEntities | None = None,
+    force: bool = False,
 ) -> SourceStats:
-    """Diff one source's discover() output against the DB and converge it."""
+    """Diff one source's discover() output against the DB and converge it.
+
+    force=True bypasses the stat_sig/git_sha unchanged fast path: every
+    discovered document is reloaded and re-chunked even when its identity
+    signature matches the stored row. See INDEX_LAYOUT_VERSION above.
+    """
     if store_entities is None:
         store_entities = _default_store_entities
 
@@ -289,7 +313,7 @@ def update_source(
     for probe in adapter.discover():
         seen.add(probe.path)
         existing_row = existing.get(probe.path)
-        if existing_row is not None and _unchanged(probe, existing_row):
+        if not force and existing_row is not None and _unchanged(probe, existing_row):
             stats.unchanged += 1
             continue
         doc = adapter.load(probe)
@@ -316,6 +340,12 @@ def update_source(
     return stats
 
 
+def _needs_forced_rechunk(conn: sqlite3.Connection) -> bool:
+    if get_meta(conn, _LAYOUT_VERSION_KEY) == INDEX_LAYOUT_VERSION:
+        return False
+    return conn.execute("SELECT 1 FROM documents LIMIT 1").fetchone() is not None
+
+
 def update(
     config: Config,
     conn: sqlite3.Connection,
@@ -324,12 +354,15 @@ def update(
     sources: Iterable[str] | None = None,
     store_entities: StoreEntities | None = None,
 ) -> UpdateStats:
+    force = _needs_forced_rechunk(conn)
     names = list(sources) if sources is not None else [s.name for s in config.sources]
     stats = UpdateStats()
     for name in names:
         source = config.source(name)
         adapter = adapters[name]
         stats.sources[name] = update_source(
-            config, conn, source, adapter, store_entities=store_entities
+            config, conn, source, adapter, store_entities=store_entities, force=force
         )
+    with conn:
+        set_meta(conn, _LAYOUT_VERSION_KEY, INDEX_LAYOUT_VERSION)
     return stats

@@ -4,8 +4,8 @@ import pytest
 
 from corpusindex.adapters.base import Doc, DocProbe
 from corpusindex.config import Config, SourceConfig
-from corpusindex.db import connect, has_vec
-from corpusindex.indexer import SourceStats, UpdateStats, update, update_source
+from corpusindex.db import connect, get_meta, has_vec, set_meta
+from corpusindex.indexer import INDEX_LAYOUT_VERSION, SourceStats, UpdateStats, update, update_source
 
 
 def _vec_loadable() -> bool:
@@ -525,3 +525,69 @@ def test_update_respects_sources_filter(conn, config, adapters):
     stats = update(config, conn, adapters, sources=["mail"], store_entities=entities)
     assert set(stats.sources) == {"mail"}
     assert conn.execute("SELECT count(*) FROM documents").fetchone()[0] == 1
+
+
+def test_update_stamps_layout_version_on_fresh_db(conn, config, adapters):
+    update(config, conn, adapters, store_entities=EntityStub())
+    assert get_meta(conn, "layout_version") == INDEX_LAYOUT_VERSION
+
+
+def test_layout_version_bump_forces_full_rechunk_then_settles_to_noop(conn, config, adapters):
+    update(config, conn, adapters, store_entities=EntityStub())
+    with conn:
+        conn.execute("UPDATE chunks SET embedded = 1")
+    readme_id = _doc_row(conn, "notes", "readme.md")[0]
+    assert all(
+        row[0] == 1
+        for row in conn.execute("SELECT embedded FROM chunks WHERE doc_id = ?", (readme_id,))
+    )
+
+    with conn:
+        set_meta(conn, "layout_version", "1")
+
+    stale_adapters = {
+        "notes": FakeAdapter("notes", _notes_entries()),
+        "mail": FakeAdapter("mail", _mail_entries()),
+        "repo": FakeAdapter("repo", _repo_entries()),
+    }
+    stats = update(config, conn, stale_adapters, store_entities=EntityStub())
+
+    assert stats.sources["notes"].changed == 4
+    assert stats.sources["notes"].unchanged == 0
+    assert stats.sources["mail"].changed == 1
+    assert sorted(stale_adapters["notes"].loaded) == sorted(
+        e["path"] for e in _notes_entries()
+    )
+    assert all(
+        row[0] == 0
+        for row in conn.execute("SELECT embedded FROM chunks WHERE doc_id = ?", (readme_id,))
+    )
+    assert get_meta(conn, "layout_version") == INDEX_LAYOUT_VERSION
+
+    noop_adapters = {
+        "notes": FakeAdapter("notes", _notes_entries()),
+        "mail": FakeAdapter("mail", _mail_entries()),
+        "repo": FakeAdapter("repo", _repo_entries()),
+    }
+    for a in noop_adapters.values():
+        a.forbid_load = True
+
+    stats = update(config, conn, noop_adapters, store_entities=EntityStub())
+
+    assert stats.sources["notes"] == SourceStats(unchanged=4)
+    assert stats.sources["mail"] == SourceStats(unchanged=1)
+    assert stats.sources["repo"] == SourceStats(unchanged=2)
+    assert get_meta(conn, "layout_version") == INDEX_LAYOUT_VERSION
+
+
+def test_update_source_direct_call_ignores_layout_version(conn, config, adapters):
+    with conn:
+        set_meta(conn, "layout_version", "1")
+
+    update_source(
+        config, conn, config.source("notes"), adapters["notes"], store_entities=EntityStub()
+    )
+    second = FakeAdapter("notes", _notes_entries())
+    second.forbid_load = True
+    stats = update_source(config, conn, config.source("notes"), second, store_entities=EntityStub())
+    assert stats == SourceStats(unchanged=4)
