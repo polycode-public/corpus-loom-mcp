@@ -16,19 +16,23 @@ where the build taught us something.
 
 ## In flight
 
-| Workstream | Agent label | Branch | Worktree | Status |
-|---|---|---|---|---|
-| W5 release | the release agent | agent/release | scratchpad/wt-release | running |
+(none — all waves complete)
 
-## Merged, awaiting verification
+## Done and verified
 
-(none — W1–W4 verified: 234 tests green on main. Pipeline fixes applied at
-merges: multi-recipient To/Cc via getaddresses (W2); default entities seam
-loads Seeds/Aliases from config paths (W4, found by the cli agent).)
+All five waves merged and verified: 237 tests green on main at v0.1.0.
+First real deployment (~/projects/diy-accounting-limited/index/) verified:
+48,696 docs / 88,350 chunks indexed in 20 min; no-op rerun 4.8 s; M0 checks
+pass; 79,927 chunks embedded (~40M tokens); M1 paraphrase-query check passes;
+MCP registered in Claude Code.
 
-## After W5 release merges
+Production fixes fed back during deployment: multi-recipient To/Cc via
+getaddresses; default entities seam loads Seeds/Aliases; code-chunk token
+budgeting 2x + batch bisection on API size rejection (found live against
+Voyage's 120K cap).
 
-Deployment in ~/projects/diy-accounting-limited/index/ (corpus.toml over the
-five repos + drive + mail mirrors, archive commits-only, finance/personnel
-embed_exclude), M0 verification against real corpora, embed dry-run, operator
-gate, drain. Fixes found there feed back to this repo.
+## Candidate next work (not started)
+
+- `--rerank` implementation (voyage rerank-2) — CLI flag currently a no-op notice.
+- PyPI / GitHub package publishing when wanted; git-install is the supported path.
+- Desktop registration of the MCP is manual (claude_desktop_config.json).
