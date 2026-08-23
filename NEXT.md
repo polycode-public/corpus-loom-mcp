@@ -18,13 +18,13 @@ where the build taught us something.
 
 | Workstream | Agent label | Branch | Worktree | Status |
 |---|---|---|---|---|
-| W1 foundation | the foundation agent | agent/foundation | scratchpad/wt-foundation | running |
+| W2 adapters | the adapters agent | agent/adapters | scratchpad/wt-adapters | running |
+| W2 entities | the entities agent | agent/entities | scratchpad/wt-entities | running |
+| W2 indexer | the indexer agent | agent/indexer | scratchpad/wt-indexer | running |
+
+W2 seam (both sides build to this): entities exposes
+`store_doc_entities(conn, doc_id, doc, seeds, aliases)`; indexer calls it.
 
 ## Merged, awaiting verification
 
-- W1 extract (`agent/extract`, 5 commits, 57 tests green on main) — verify against
-  foundation's fixture corpus once W1 foundation merges; then remove.
-  Settled API: decode.classify/decode_text, html_to_text, mailbody.extract_body →
-  MailBody(text, attachments), chunk_prose/csv/code/whole (header-prefixed),
-  convert() never raises. classify() is intrinsic; per-source convert gating
-  belongs to config/indexer.
+(none — W1 verified: 99 tests green on main at c86c4b0)
