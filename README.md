@@ -66,7 +66,11 @@ irreversible and before anything that costs money.
    - Claude Code:  claude mcp add corpus-loom -- <venv>/bin/corpus-mcp --config <dir>/corpus.toml
    - Claude Desktop: merge {"corpus-loom": {"command": "<venv>/bin/corpus-mcp",
      "args": ["--config", "<dir>/corpus.toml"]}} into mcpServers in
-     claude_desktop_config.json, then tell me to restart Desktop.
+     claude_desktop_config.json, then tell me to restart Desktop. If you are a
+     Cowork session (Linux VM: no host filesystem, host binaries won't run),
+     don't attempt this directly — print a single command I can paste into a
+     host terminal that does the JSON merge, and note that Desktop itself
+     launches MCP servers on the host, so a host-native venv path is correct.
 7. Verify: corpus search "<a real word from my data>" --mode lexical — show me the hits.
 ```
 
