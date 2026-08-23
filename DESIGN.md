@@ -6,6 +6,8 @@
 
 > "We don't need to index the email attachments which are .doc / .docx / .xls / .xslx / gzip etc.. perhaps a useful rule is if we need to run conversion rather than a decoder even if with an internal library we can avoid indexing. This is because most of those will be copies of the product that we already have in git and some may have customer's account data that we don't need to use for anything."
 
+> "for file on drive we do want to index .doc and .docx contents also pdfs anything that might be a "document" but not tabular data (spredsheets)."
+
 ## Shape of the system
 
 Two pieces:
@@ -24,21 +26,24 @@ Single SQLite file, no server infrastructure beyond the MCP process. Layers:
 
 ## Corpus facts (verified on disk, 2026-08-23)
 
-- **Drive** (`drive/DIY Accounting Limited/`, 5,345 files, 2.1 GiB): by extension, 2,006 pdf / 846 xlsx / 617 png / 414 csv / 331 docx / 308 txt / 254 doc / 253 xls dominate. Decoder-indexable set (txt, csv, md, html/htm, css, js, xml, sh, ini): ~800 files — everything else is metadata-only via `MANIFEST.md` names/paths/sizes.
+- **Drive** (`drive/DIY Accounting Limited/`, 5,345 files, 2.1 GiB): by extension, 2,006 pdf / 846 xlsx / 617 png / 414 csv / 331 docx / 308 txt / 254 doc / 253 xls dominate. Decoder-indexable set (txt, csv, md, html/htm, css, js, xml, sh, ini): ~800 files. Document-conversion set (2,006 pdf + 331 docx + 254 doc ≈ 2,600): content-indexed under the Drive documents ruling below. Spreadsheets (846 xlsx + 253 xls), images and other binaries: metadata-only via `MANIFEST.md` names/paths/sizes.
 - **Mail** (38,524 messages; antony@ 1.4 GiB, support@ 16 GiB): gyb layout `mail/<mailbox>/YYYY/M/D/<hex>.eml` (date parts **not** zero-padded). Bodies sampled: mix of `multipart/alternative` (plain + HTML), HTML-only (`text/html` base64, no plain part — stdlib `get_body()` decodes cleanly), and bare `text/plain`. Charsets seen: utf-8, us-ascii, iso-8859-1 — all stdlib-decodable. The 16 GiB is mostly base64 attachment parts *inside* the .eml files, so the adapter must walk MIME parts selectively; indexed text is orders of magnitude smaller. gyb also maintains `mail/<mailbox>/msg-db.sqlite` with a `labels` table — read Gmail labels from it (keyed by filename stem) as document metadata.
 - **Repos**: submit (909 tracked files, mostly js/md/java), spreadsheets (2,249 tracked files, of which 1,511 under `packages/` are nightly-generated xlsx/pdf/docx), www, root, and diy-accounting-archive (8,607 tracked files: 3,862 xlsx + 3,313 xls + 656 ods + 266 pdf; ~270 text files; 98 commits, last 2026-05).
 - 3 `winmail.dat` (TNEF) attachments exist — attachments are metadata-only anyway.
 
-## Content rule: decoder yes, converter no
+## Content rule: decoder yes, converter no — except Drive documents
 
-Content is indexed only when readable with a plain decoder (charset, MIME structure, transfer-encoding, HTML markup). Anything requiring format *conversion* — .doc/.docx, .xls/.xlsx/.ods, PDF, archives, images — is metadata-only (findable by name/path/date/sender), even where a library could convert internally. Rationale: most such files are copies of the product already in git, and some carry customer account data we don't need to use for anything.
+Base rule: content is indexed when readable with a plain decoder (charset, MIME structure, transfer-encoding, HTML markup); formats requiring *conversion* are metadata-only (findable by name/path/date/sender). Rationale: most such files are copies of the product already in git, and some carry customer account data we don't need to use for anything.
+
+**Drive documents refinement** (operator, 2026-08-23): on the Drive source, prose *documents* are content-indexed even though conversion is required — .pdf, .doc, .docx (plus .rtf/.odt if encountered) — letters, minutes, contracts are precisely what retrieval is for. **Tabular data (spreadsheets: .xls/.xlsx/.ods) stays metadata-only regardless** — that's where the product copies and account data live. **Mail attachments stay metadata-only without exception.**
 
 Rulings this plan makes under the rule:
 
 - **HTML → text is decoding**, not conversion: charset decode + quoted-printable/base64 transfer decode + tag strip (stdlib `HTMLParser`; drop `script`/`style`, unescape entities). HTML-only mail bodies and .html files are therefore content-indexed. Without this ruling a large share of post-2015 mail would be invisible.
-- **CSV is text** — content-indexed as-is, no parsing required.
-- **Indexed content**: mail text/plain and text/html body parts; Drive files with extensions txt, csv, md, html, htm, css, js, xml, sh, ini; repo files that are git-tracked, decoder-indexable by the same extension test plus code extensions (configurable per source; binary-sniff guard: skip any file whose first 8 KiB contains NUL).
-- **Metadata-only**: everything else, including all mail attachments (filenames recorded from MIME part names), all Office/PDF files anywhere, and `credentials.kdbx`.
+- **CSV is text** — content-indexed as-is, no parsing required. The tabular exclusion targets spreadsheet formats, not decoder-readable exports of the company's own records.
+- **Conversion is per-source opt-in config** (`convert = ["pdf", "doc", "docx"]` on the drive source only; default empty, so the engine's base behaviour remains pure decoder). Tooling: `pdftotext` (poppler) for PDF; `textutil` (macOS built-in) or python-docx for .doc/.docx. A file whose conversion fails or yields no text degrades to metadata-only, counted and logged — never a hard error.
+- **Indexed content**: mail text/plain and text/html body parts; Drive decoder set (txt, csv, md, html, htm, css, js, xml, sh, ini) plus the Drive document-conversion set above; repo files that are git-tracked, decoder-indexable by the same extension test plus code extensions (configurable per source; binary-sniff guard: skip any file whose first 8 KiB contains NUL).
+- **Metadata-only**: everything else, including all mail attachments (filenames recorded from MIME part names), all spreadsheet files anywhere, images, archives, and `credentials.kdbx`.
 
 ### Per-repo decisions
 
@@ -127,7 +132,7 @@ Token ≈ 4 chars (approximation used for all limits). Every chunk is prefixed w
 | Content | Target | Overlap | Split preference | Model |
 |---|---|---|---|---|
 | Mail body (after HTML→text, strip quoted history: `>`-prefixed lines and `On … wrote:` tails; keep top-post text) | 1,000 tok | 100 tok | blank lines | voyage-3.5 |
-| Prose/text/CSV (md split at headings first; CSV chunks each re-prefixed with the header row) | 1,000 tok | 100 tok | blank lines / headings | voyage-3.5 |
+| Prose/text/CSV, incl. converted Drive documents (md split at headings first; CSV chunks each re-prefixed with the header row) | 1,000 tok | 100 tok | blank lines / headings | voyage-3.5 |
 | Source code | 1,500 tok | 0 | unindented (top-level) lines, else blank lines | voyage-code-3 |
 | Commit message | whole message, one chunk | — | — | voyage-3.5 |
 
@@ -188,7 +193,7 @@ Registered once in Claude Desktop and Claude Code config, pointing at the worksp
 ## Standalone repo layout
 
 ```
-<repo>/                                # name/org/license: open question 2
+corpus-loom-mcp/                       # github.com/polycode-public/corpus-loom-mcp, MPL-2.0
 ├── pyproject.toml                     # deps: fastmcp, sqlite-vec, voyageai, tomli; entry points corpus, corpus-mcp
 ├── README.md  LICENSE
 ├── src/corpusindex/
@@ -202,6 +207,7 @@ Registered once in Claude Desktop and Claude Code config, pointing at the worksp
 │   ├── extract/
 │   │   ├── decode.py                  # decoder-yes/converter-no gate: extension table, NUL sniff, charset fallbacks (utf-8 → declared → latin-1)
 │   │   ├── html_text.py               # stdlib HTMLParser tag strip
+│   │   ├── convert.py                 # per-source opt-in document conversion: pdftotext, textutil/python-docx; failure ⇒ metadata-only
 │   │   ├── mailbody.py                # part selection, quoted-history strip
 │   │   └── chunk.py                   # policy table above
 │   ├── entities.py                    # extraction, normalisation, seeds/aliases application
@@ -219,7 +225,7 @@ Workspace-specific (stays in this workspace, never in the engine repo): `index/c
 
 **M0 — engine scaffold + lexical index (no API cost).** Repo skeleton, config, schema, three adapters, decode/chunk, `corpus update --no-embed`, FTS-only `corpus search --mode lexical`, entities. Verify against this workspace: (a) `corpus stats` document counts reconcile with `MANIFEST.md` (5,345 drive docs), `INDEX.tsv` (38,524 mail docs), and `git ls-files` minus excludes per repo; (b) a known invoice-number query returns the right message; (c) "everything involving NatWest in 2023" (`corpus entity natwest` + date filter) returns mail, Drive docs, and any commits; (d) rerunning `update` immediately is a no-op in <30 s; (e) deleting a mirror file and rerunning removes its rows.
 
-**M1 — embeddings + hybrid.** `corpus embed --dry-run` first: report chunk/token counts and projected cost (expectation: low single-digit dollars at voyage-3.5 pricing; gate actual spend on the dry-run number and open question 1). Then drain, wire RRF as default `--mode hybrid`. Verify: a paraphrase query with no keyword overlap (e.g. "customer wants money back for the wrong product" → the "Purchased wrong package" support thread) retrieves the right document; kill-and-resume mid-drain double-embeds nothing; a touched-but-unchanged file re-embeds nothing.
+**M1 — embeddings + hybrid.** `corpus embed --dry-run` first: report chunk/token counts and projected cost (expectation: several dollars at voyage-3.5 pricing now the ~2,600 converted Drive documents are included; gate actual spend on the dry-run number and open question 1). Then drain, wire RRF as default `--mode hybrid`. Verify: a paraphrase query with no keyword overlap (e.g. "customer wants money back for the wrong product" → the "Purchased wrong package" support thread) retrieves the right document; kill-and-resume mid-drain double-embeds nothing; a touched-but-unchanged file re-embeds nothing.
 
 **M2 — MCP.** `corpus-mcp` exposing the three tools; register in Claude Desktop and Claude Code. Verify: a Desktop session answers a cross-source question ("what did we tell customers when VAT went to 20%, and what changed in the product?") through the MCP alone, no filesystem scanning.
 
@@ -227,5 +233,4 @@ Workspace-specific (stays in this workspace, never in the engine repo): `index/c
 
 ## Open questions (operator decision needed)
 
-1. **Send support@ bodies to the Voyage API?** Embedding transmits customer-support message text (names, addresses, occasionally account details) to a third-party API. Options: (a) embed everything — simplest, best recall, acceptable if Voyage's zero-retention API terms satisfy you; (b) `embed = false` on the mail source for support@ only — support mail stays fully lexically searchable and entity-linked, semantic search covers everything else. Config already supports either; default in this plan is (a) pending your call.
-2. **Name, GitHub org, and license for the standalone repo** (e.g. MIT vs Apache-2.0; `diy-accounting-uk` vs a personal org given it's generic infrastructure).
+1. **Send support@ bodies (and now converted Drive finance/personnel documents) to the Voyage API?** Embedding transmits that text (names, addresses, occasionally account details) to a third-party API. Options: (a) embed everything — simplest, best recall, acceptable if Voyage's zero-retention API terms satisfy you; (b) `embed = false` per source/path-glob — the excluded material stays fully lexically searchable and entity-linked, semantic search covers everything else. Config supports either; default in this plan is (a) pending your call, gated at the M1 dry-run.
