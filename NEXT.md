@@ -16,7 +16,14 @@ where the build taught us something.
 
 ## In flight
 
-(none — all waves complete)
+| Workstream | Agent label | Branch | Worktree | Status |
+|---|---|---|---|---|
+| headers | the headers agent | agent/headers | scratchpad/wt-headers | running |
+
+Scope: mail headers (incl. new bcc/reply-to capture) + Gmail labels into a
+synthetic seq-0 FTS chunk per message; bcc/reply_to entity rels; generic
+INDEX_LAYOUT_VERSION force-re-chunk mechanism. Operator-requested after a
+Desktop session found labels/recipients unsearchable.
 
 ## Done and verified
 
