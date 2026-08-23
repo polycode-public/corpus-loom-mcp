@@ -19,12 +19,13 @@ where the build taught us something.
 | Workstream | Agent label | Branch | Worktree | Status |
 |---|---|---|---|---|
 | W2 adapters | the adapters agent | agent/adapters | scratchpad/wt-adapters | running |
-| W2 entities | the entities agent | agent/entities | scratchpad/wt-entities | running |
-| W2 indexer | the indexer agent | agent/indexer | scratchpad/wt-indexer | running |
-
-W2 seam (both sides build to this): entities exposes
-`store_doc_entities(conn, doc_id, doc, seeds, aliases)`; indexer calls it.
+| W3 search | the search agent | agent/search | scratchpad/wt-search | running |
+| W3 embed | the embed agent | agent/embed | scratchpad/wt-embed | running |
 
 ## Merged, awaiting verification
 
-(none — W1 verified: 99 tests green on main at c86c4b0)
+- W2 entities + indexer merged and verified (127 tests green on main).
+  CHECK AT ADAPTERS MERGE: entities expects mail meta from/to/cc values as
+  address string(s) ("Name <addr>" ok, parseaddr'd) or {email,name} mappings;
+  commit meta as flat author_name/author_email strings. Confirm eml_tree /
+  gitrepo conform, else shim in indexer.

@@ -249,11 +249,6 @@ def _parse_one_address(item: Any) -> tuple[str, str | None] | None:
         if not addr:
             return None
         return str(addr).strip(), (str(name).strip() if name else None) or None
-    if isinstance(item, str):
-        name, addr = _emailutils.parseaddr(item)
-        if not addr:
-            return None
-        return addr.strip(), (name.strip() if name else None) or None
     return None
 
 
@@ -262,10 +257,18 @@ def _parse_address_field(value: Any) -> list[tuple[str, str | None]]:
         return []
     items = value if isinstance(value, list) else [value]
     out: list[tuple[str, str | None]] = []
+    strings: list[str] = []
     for item in items:
+        if isinstance(item, str):
+            strings.append(item)
+            continue
         parsed = _parse_one_address(item)
         if parsed:
             out.append(parsed)
+    # A single header string may hold several comma-separated recipients.
+    for name, addr in _emailutils.getaddresses(strings):
+        if addr:
+            out.append((addr.strip(), (name.strip() if name else None) or None))
     return out
 
 
