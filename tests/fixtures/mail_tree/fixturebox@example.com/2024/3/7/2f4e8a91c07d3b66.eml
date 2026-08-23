@@ -1,0 +1,40 @@
+Return-Path: <renewals@hollowbeck.example.com>
+Delivered-To: fixturebox@example.com
+Received: from smtp4.hollowbeck.example.com (smtp4.hollowbeck.example.com [192.0.2.44])
+        by mx.example.com with ESMTPS id k2si448211wme.19.2024.03.07
+        for <fixturebox@example.com>;
+        Thu, 7 Mar 2024 16:05:07 +0000 (UTC)
+Message-ID: <20240307160501.8842E1D3@smtp4.hollowbeck.example.com>
+Date: Thu, 7 Mar 2024 16:05:01 +0000
+From: Hollowbeck Hosting Renewals <renewals@hollowbeck.example.com>
+To: fixturebox@example.com
+Cc: Devon Aylward <devon.aylward@hollowbeck.example.com>
+Subject: Your hosting plan renews on 1 April 2024
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="----=_Part_5501_940122764.1709827501"
+
+------=_Part_5501_940122764.1709827501
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+Dear customer,
+
+Your Hollowbeck hosting plan (ref HB-20441) renews automatically on
+1 April 2024 at the standard annual rate. No action is needed to
+continue service.
+
+The Hollowbeck team
+
+------=_Part_5501_940122764.1709827501
+Content-Type: text/html; charset="utf-8"
+Content-Transfer-Encoding: 7bit
+
+<html><body>
+<p>Dear customer,</p>
+<p>Your Hollowbeck hosting plan (ref <b>HB-20441</b>) renews automatically
+on <b>1 April 2024</b> at the standard annual rate. No action is needed
+to continue service.</p>
+<p>The Hollowbeck team</p>
+</body></html>
+
+------=_Part_5501_940122764.1709827501--
