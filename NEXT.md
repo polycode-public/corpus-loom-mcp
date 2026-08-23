@@ -18,14 +18,10 @@ where the build taught us something.
 
 | Workstream | Agent label | Branch | Worktree | Status |
 |---|---|---|---|---|
-| W2 adapters | the adapters agent | agent/adapters | scratchpad/wt-adapters | running |
-| W3 search | the search agent | agent/search | scratchpad/wt-search | running |
-| W3 embed | the embed agent | agent/embed | scratchpad/wt-embed | running |
+| W4 cli | the cli agent | agent/cli | scratchpad/wt-cli | running |
+| W4 mcp | the mcp agent | agent/mcp | scratchpad/wt-mcp | running |
 
 ## Merged, awaiting verification
 
-- W2 entities + indexer merged and verified (127 tests green on main).
-  CHECK AT ADAPTERS MERGE: entities expects mail meta from/to/cc values as
-  address string(s) ("Name <addr>" ok, parseaddr'd) or {email,name} mappings;
-  commit meta as flat author_name/author_email strings. Confirm eml_tree /
-  gitrepo conform, else shim in indexer.
+(none — W1–W3 verified: 197 tests green on main. Pipeline fix applied at W2
+merge: multi-recipient To/Cc headers now expand via getaddresses.)
