@@ -342,3 +342,45 @@ def test_resolve_api_key_missing_raises(tmp_path):
     config = Config(db=tmp_path / "corpus.db", sources=(), config_dir=tmp_path)
     with pytest.raises(EmbedError):
         resolve_api_key(config)
+
+
+# --- batch bisection on API token-limit rejection ---------------------------
+
+
+def test_drain_bisects_batch_rejected_for_token_limit(conn, config):
+    from corpusindex.db import has_vec
+    from corpusindex.embed import drain
+
+    _insert_doc(
+        conn,
+        "main",
+        "notes/big.md",
+        ["prose one widgets", "prose two widgets", "prose three widgets"],
+    )
+
+    class LimitClient:
+        def __init__(self):
+            self.calls: list[list[str]] = []
+
+        def embed(self, texts, model=None, input_type=None):
+            self.calls.append(list(texts))
+            if len(texts) > 1:
+                raise ValueError(
+                    "The max allowed tokens per submitted batch is 120000. "
+                    "Your batch has 162991 tokens after truncation."
+                )
+            return _FakeResult([_vector_for(t) for t in texts])
+
+    if not has_vec(conn):
+        pytest.skip("sqlite-vec unavailable")
+
+    client = LimitClient()
+    stats = drain(config, conn, client_factory=lambda: client)
+
+    assert stats.embedded == 3
+    assert conn.execute("SELECT count(*) FROM chunks WHERE embedded = 1").fetchone()[0] == 3
+    assert conn.execute("SELECT count(*) FROM chunks_vec_prose").fetchone()[0] == 3
+    # Bisection: the 3-text batch and its 2-text half were rejected; each
+    # text then succeeded individually.
+    assert [len(c) for c in client.calls if len(c) > 1] == [3, 2]
+    assert sum(1 for c in client.calls if len(c) == 1) == 3

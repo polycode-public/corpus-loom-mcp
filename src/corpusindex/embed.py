@@ -129,6 +129,26 @@ def plan(config: Config, conn) -> EmbedPlan:
     return result
 
 
+def _is_batch_too_large_error(exc: Exception) -> bool:
+    return "max allowed tokens" in str(exc).lower()
+
+
+def _embed_batch_split(
+    client: object, texts: list[str], model_name: str, max_retries: int, stats: "EmbedStats"
+) -> list[list[float]]:
+    # Char-based token estimates can undershoot the API's real count; when a
+    # batch is rejected for size, bisect and retry the halves.
+    try:
+        return _embed_batch(client, texts, model_name, max_retries, stats)
+    except Exception as exc:
+        if len(texts) <= 1 or not _is_batch_too_large_error(exc):
+            raise
+    mid = len(texts) // 2
+    return _embed_batch_split(
+        client, texts[:mid], model_name, max_retries, stats
+    ) + _embed_batch_split(client, texts[mid:], model_name, max_retries, stats)
+
+
 def _next_batch(
     conn, config: Config, kind: ModelKind, batch_chunks: int, batch_tokens: int
 ) -> list[tuple[int, str]]:
@@ -138,6 +158,10 @@ def _next_batch(
         if model_kind_for(path) != kind:
             continue
         tokens = _estimate_tokens(text)
+        if kind == "code":
+            # Dense code tokenises far below 4 chars/token; budget it at
+            # double the char-based estimate to stay under API batch caps.
+            tokens *= 2
         if batch and (len(batch) + 1 > batch_chunks or total_tokens + tokens > batch_tokens):
             break
         batch.append((chunk_id, text))
@@ -237,7 +261,7 @@ def drain(
             if not batch:
                 break
             texts = [text for _chunk_id, text in batch]
-            vectors = _embed_batch(client, texts, model_name, max_retries, stats)
+            vectors = _embed_batch_split(client, texts, model_name, max_retries, stats)
             with conn:
                 for (chunk_id, _text), vector in zip(batch, vectors):
                     conn.execute(
