@@ -189,3 +189,36 @@ def test_missing_msg_db_gives_empty_labels():
     adapter = EmlTreeAdapter(_config())
     doc = _load(adapter, "2024/3/7/17a0c9e4b21f83d5.eml")
     assert doc.meta["labels"] == []
+
+
+def test_real_gyb_schema_labels_via_join(tmp_path):
+    mailbox = tmp_path / "mailbox"
+    shutil.copytree(FIXTURE_ROOT, mailbox)
+
+    db_path = mailbox / "msg-db.sqlite"
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "CREATE TABLE messages ("
+        "message_num INTEGER PRIMARY KEY, "
+        "message_filename TEXT, "
+        "message_internaldate TIMESTAMP)"
+    )
+    conn.execute("CREATE TABLE labels (message_num INTEGER, label TEXT)")
+    conn.execute("CREATE TABLE uids (message_num INTEGER, uid INTEGER)")
+    conn.execute(
+        "INSERT INTO messages (message_num, message_filename) VALUES (1, ?)",
+        ("2024/3/7/17a0c9e4b21f83d5.eml",),
+    )
+    conn.executemany(
+        "INSERT INTO labels (message_num, label) VALUES (?, ?)",
+        [(1, "Responded"), (1, "IMPORTANT"), (1, "STARRED")],
+    )
+    conn.commit()
+    conn.close()
+
+    adapter = EmlTreeAdapter(_config(root=mailbox))
+    labelled = _load(adapter, "2024/3/7/17a0c9e4b21f83d5.eml")
+    assert labelled.meta["labels"] == ["Responded", "IMPORTANT", "STARRED"]
+
+    unlabelled = _load(adapter, "2024/11/2/9c31d7e5a8f2404b.eml")
+    assert unlabelled.meta["labels"] == []

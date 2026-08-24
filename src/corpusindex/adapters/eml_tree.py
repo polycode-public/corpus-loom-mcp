@@ -42,6 +42,24 @@ def _load_labels(root: Path) -> dict[str, list[str]]:
             row[0]
             for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         ]
+        # gyb's actual schema: messages(message_num, message_filename) joined to
+        # labels(message_num, label), one row per label. Try it first; fall back
+        # to the generic single-table introspection for anything else.
+        if {"messages", "labels"} <= set(tables):
+            try:
+                rows = conn.execute(
+                    "SELECT m.message_filename, l.label"
+                    " FROM messages m JOIN labels l USING (message_num)"
+                )
+                for fname_val, label_val in rows:
+                    if not fname_val or not label_val:
+                        continue
+                    stem = Path(str(fname_val)).stem
+                    labels.setdefault(stem, []).append(str(label_val).strip())
+            except sqlite3.Error:
+                labels = {}
+            if labels:
+                return labels
         for table in tables:
             columns = [row[1] for row in conn.execute(f"PRAGMA table_info({table})")]
             lower = {c.lower(): c for c in columns}

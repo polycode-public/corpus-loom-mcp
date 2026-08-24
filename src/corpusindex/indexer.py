@@ -52,7 +52,7 @@ StoreEntities = Callable[[sqlite3.Connection, int, Doc, object, object], None]
 
 _VEC_TABLES = ("chunks_vec_prose", "chunks_vec_code")
 
-INDEX_LAYOUT_VERSION = "2"
+INDEX_LAYOUT_VERSION = "3"
 _LAYOUT_VERSION_KEY = "layout_version"
 
 
