@@ -7,6 +7,7 @@ import email.policy
 import hashlib
 import io
 import sqlite3
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Iterator
@@ -14,6 +15,7 @@ from typing import Iterator
 from corpusindex.adapters.base import Doc, DocProbe
 from corpusindex.adapters.filetree import SKIP_DIR_NAMES, matches_globs
 from corpusindex.config import SourceConfig
+from corpusindex.extract.convert import convert
 from corpusindex.extract.mailbody import extract_body
 
 LABELS_DB_NAME = "msg-db.sqlite"
@@ -105,6 +107,36 @@ def _header_str(msg: email.message.Message, name: str) -> str | None:
     return str(value) if value is not None else None
 
 
+def _convert_attachments(msg: email.message.Message, convert_exts: tuple[str, ...]) -> str:
+    """Text extracted from attachments whose extension is in convert_exts.
+
+    Each matching attachment's bytes are written to a temp file, because the
+    converters (same ones the filetree adapter uses) take a path rather than
+    bytes, then converted and prefixed with a marker line naming the file.
+    Blocks are joined so the result can be appended to the message body.
+    """
+    if not convert_exts:
+        return ""
+    blocks = []
+    for part in msg.iter_attachments():
+        filename = part.get_filename()
+        if not filename:
+            continue
+        ext = Path(filename).suffix.lower().lstrip(".")
+        if ext not in convert_exts:
+            continue
+        payload = part.get_payload(decode=True)
+        if not payload:
+            continue
+        with tempfile.NamedTemporaryFile(suffix=f".{ext}") as tmp:
+            tmp.write(payload)
+            tmp.flush()
+            converted = convert(tmp.name)
+        if converted:
+            blocks.append(f"--- attachment: {filename} ---\n{converted}")
+    return "\n\n".join(blocks)
+
+
 class EmlTreeAdapter:
     def __init__(self, config: SourceConfig) -> None:
         self.config = config
@@ -144,6 +176,10 @@ class EmlTreeAdapter:
 
         body = extract_body(msg)
         text = body.text if body.text else None
+
+        attachment_text = _convert_attachments(msg, self.config.convert)
+        if attachment_text:
+            text = f"{text}\n\n{attachment_text}" if text else attachment_text
 
         stem = Path(probe.path).stem
         meta = {

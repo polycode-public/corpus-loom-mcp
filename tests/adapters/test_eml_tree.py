@@ -1,6 +1,8 @@
+import base64
 import re
 import shutil
 import sqlite3
+import stat
 from pathlib import Path
 
 from corpusindex.adapters.eml_tree import EmlTreeAdapter
@@ -222,3 +224,58 @@ def test_real_gyb_schema_labels_via_join(tmp_path):
 
     unlabelled = _load(adapter, "2024/11/2/9c31d7e5a8f2404b.eml")
     assert unlabelled.meta["labels"] == []
+
+
+def _write_fake_tool(bin_dir, name: str, script: str):
+    tool_path = bin_dir / name
+    tool_path.write_text(script)
+    tool_path.chmod(tool_path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+    return tool_path
+
+
+def test_pdf_attachment_converted_when_extension_in_convert_list(monkeypatch, tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _write_fake_tool(
+        bin_dir, "pdftotext",
+        "#!/bin/sh\necho 'Invoice total: £430.00'\n",
+    )
+    monkeypatch.setenv("PATH", str(bin_dir))
+
+    mailbox = tmp_path / "mailbox"
+    day_dir = mailbox / "2024" / "9" / "2"
+    day_dir.mkdir(parents=True)
+    attachment_b64 = base64.b64encode(b"not a real pdf, fixture bytes only").decode()
+    (day_dir / "withpdf.eml").write_bytes(
+        b"From: sender@example.com\r\n"
+        b"To: fixturebox@example.com\r\n"
+        b"Subject: Invoice attached\r\n"
+        b"MIME-Version: 1.0\r\n"
+        b'Content-Type: multipart/mixed; boundary="=-boundary"\r\n'
+        b"\r\n"
+        b"--=-boundary\r\n"
+        b'Content-Type: text/plain; charset="utf-8"\r\n'
+        b"Content-Transfer-Encoding: 7bit\r\n"
+        b"\r\n"
+        b"Please find the invoice attached.\r\n"
+        b"\r\n"
+        b"--=-boundary\r\n"
+        b"Content-Type: application/pdf; name=\"invoice-2024-09.pdf\"\r\n"
+        b'Content-Disposition: attachment; filename="invoice-2024-09.pdf"\r\n'
+        b"Content-Transfer-Encoding: base64\r\n"
+        b"\r\n" + attachment_b64.encode() + b"\r\n"
+        b"--=-boundary--\r\n"
+    )
+
+    adapter = EmlTreeAdapter(_config(root=mailbox, convert=("pdf",)))
+    doc = _load(adapter, "2024/9/2/withpdf.eml")
+
+    assert "Please find the invoice attached." in doc.text
+    assert "--- attachment: invoice-2024-09.pdf ---" in doc.text
+    assert "Invoice total: £430.00" in doc.text
+
+
+def test_attachment_not_converted_when_extension_absent_from_convert_list():
+    adapter = EmlTreeAdapter(_config())
+    doc = _load(adapter, "2025/1/6/6d2a9f0e4c7b1358.eml")
+    assert "--- attachment:" not in (doc.text or "")
